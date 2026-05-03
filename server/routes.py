@@ -61,7 +61,6 @@ USEFUL PATTERN — how to save a new row:
 """
 
 import logging
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -73,18 +72,37 @@ from .schemas import (
 from .auth import hash_password, verify_password, create_token, require_auth
 from .crypto import encrypt, decrypt
 
-
 log = logging.getLogger(__name__)
 router = APIRouter()
-
 
 # ---------------------------------------------------------------------------
 # TODO 1 — Register a new user
 # ---------------------------------------------------------------------------
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    # your code here
-    pass
+    """
+    רושם משתמש חדש במערכת לאחר בדיקה שהשם אינו תפוס ושמירת סיסמה מוצפנת (Hash).
+    """
+    # 1. בדיקה האם שם המשתמש כבר קיים במסד הנתונים
+    existing_user = db.query(User).filter(User.username == body.username).first()
+    if existing_user:
+        log.warning(f"Registration failed: username {body.username} already taken")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+
+    # 2. יצירת "טביעת אצבע" לסיסמה (Hashing) - לעולם לא שומרים טקסט גלוי
+    hashed_pwd = hash_password(body.password)
+
+    # 3. שמירת המשתמש החדש
+    new_user = User(username=body.username, password_hash=hashed_pwd)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    log.info(f"User {body.username} registered successfully")
+    return {"message": "User created successfully"}
 
 
 # ---------------------------------------------------------------------------
@@ -92,8 +110,25 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
-    # your code here
-    pass
+    """
+    מאמת את פרטי המשתמש ומנפיק תג (JWT) לשימוש עתידי.
+    """
+    # 1. חיפוש המשתמש במסד הנתונים
+    user = db.query(User).filter(User.username == body.username).first()
+    
+    # 2. אימות המשתמש והסיסמה (בדיקת ה-Hash)
+    if not user or not verify_password(body.password, user.password_hash):
+        log.warning(f"Login failed for user: {body.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+
+    # 3. יצירת ה-Token (החתימה הדיגיטלית)
+    access_token = create_token(username=user.username)
+    
+    log.info(f"User {body.username} logged in")
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +140,30 @@ def send_message(
     db: Session = Depends(get_db),
     username: str = Depends(require_auth),
 ):
-    # your code here
-    pass
+    """
+    שולח הודעה מוצפנת ממשתמש מאומת לנמען מסוים.
+    """
+    # 1. הצפנת תוכן ההודעה (AES-256-GCM)
+    ciphertext = encrypt(body.content)
+
+    # 2. שמירת ההודעה המוצפנת במסד הנתונים
+    new_message = Message(
+        sender=username,
+        recipient=body.recipient,
+        ciphertext=ciphertext
+    )
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    # 3. החזרת ההודעה עם תוכן מפוענח לצורך תצוגה מיידית למשתמש השולח
+    return MessageResponse(
+        id=new_message.id,
+        sender=new_message.sender,
+        recipient=new_message.recipient,
+        content=body.content,  # מחזירים את הטקסט המקורי
+        created_at=new_message.created_at
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -117,5 +174,29 @@ def get_messages(
     db: Session = Depends(get_db),
     username: str = Depends(require_auth),
 ):
-    # your code here
-    pass
+    """
+    שולף את כל ההודעות שבהן המשתמש הנוכחי הוא השולח או הנמען, ומפענח אותן.
+    """
+    # 1. שליפת הודעות הרלוונטיות למשתמש בלבד (אבטחה בסיסית)
+    messages = db.query(Message).filter(
+        (Message.sender == username) | (Message.recipient == username)
+    ).order_by(Message.created_at.asc()).all()
+
+    # 2. פענוח כל הודעה לפני החזרתה
+    decrypted_messages = []
+    for msg in messages:
+        try:
+            plain_text = decrypt(msg.ciphertext)
+            decrypted_messages.append(MessageResponse(
+                id=msg.id,
+                sender=msg.sender,
+                recipient=msg.recipient,
+                content=plain_text,
+                created_at=msg.created_at
+            ))
+        except Exception as e:
+            log.error(f"Failed to decrypt message ID {msg.id}: {e}")
+            # במקרה של כשל בפענוח, נדלג על ההודעה או נחזיר שגיאה (תלוי במדיניות האבטחה)
+            continue
+
+    return decrypted_messages

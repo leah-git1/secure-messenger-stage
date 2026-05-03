@@ -153,16 +153,27 @@ class TestEncryption:
     # but that decrypt(ciphertext) DOES return the original plain text.
     def test_messages_are_stored_encrypted(self, client):
         from server.models import Message
-        token = register_and_login(client)
-        # send a message
-        # ... your code here ...
-        # query the DB directly
+        token = register_and_login(client, "alice", "password123")
+        secret_content = "This is a top secret message"
+        
+        # 1. שליחת הודעה דרך ה-API
+        client.post(
+            "/messages",
+            json={"content": secret_content, "recipient": "bob"},
+            headers=auth(token),
+        )
+
+        # 2. שאילתה ישירה למסד הנתונים כדי לראות מה נשמר ב-Table
         db = TestingSession()
-        row = db.query(Message).first()
+        db_message = db.query(Message).filter(Message.sender == "alice").first()
         db.close()
-        # assert the ciphertext is not plain text
-        # assert decrypt(ciphertext) returns the original
-        pass
+
+        # 3. וידוא שהטקסט ב-DB אינו הטקסט הגלוי
+        assert db_message.ciphertext != secret_content
+        
+        # 4. וידוא שניתן לפענח את מה שנשמר חזרה לטקסט המקורי
+        decrypted_text = decrypt(db_message.ciphertext)
+        assert decrypted_text == secret_content
 
 
 # ===========================================================================
@@ -203,11 +214,31 @@ class TestMessaging:
     # Verify that GET /messages returns ONLY the messages
     # where the requesting user is sender OR recipient.
     def test_user_sees_only_their_messages(self, client):
-        alice_token = register_and_login(client, "alice", "secret123")
-        bob_token   = register_and_login(client, "bob",   "secret456")
-        register_and_login(client, "charlie", "secret789")
+        alice_token   = register_and_login(client, "alice", "secret123")
+        bob_token     = register_and_login(client, "bob",   "secret456")
+        charlie_token = register_and_login(client, "charlie", "secret789")
 
-        # alice → bob
-        # charlie → bob  (alice should NOT see this)
-        # ... your code here ...
-        pass
+        # אליס שולחת לבוב
+        client.post("/messages", 
+                    json={"content": "Alice to Bob", "recipient": "bob"}, 
+                    headers=auth(alice_token))
+        
+        # צ'ארלי שולח לבוב
+        client.post("/messages", 
+                    json={"content": "Charlie to Bob", "recipient": "bob"}, 
+                    headers=auth(charlie_token))
+
+        # בדיקה של אליס: היא צריכה לראות רק את ההודעה שלה
+        alice_view = client.get("/messages", headers=auth(alice_token)).json()
+        assert len(alice_view) == 1
+        assert alice_view[0]["content"] == "Alice to Bob"
+        assert all(m["content"] != "Charlie to Bob" for m in alice_view)
+
+        # בדיקה של בוב: הוא צריך לראות את שתי ההודעות (כי הוא הנמען של שתיהן)
+        bob_view = client.get("/messages", headers=auth(bob_token)).json()
+        assert len(bob_view) == 2
+
+        # בדיקה של צ'ארלי: הוא צריך לראות רק את ההודעה שהוא שלח
+        charlie_view = client.get("/messages", headers=auth(charlie_token)).json()
+        assert len(charlie_view) == 1
+        assert charlie_view[0]["content"] == "Charlie to Bob"

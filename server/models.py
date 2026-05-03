@@ -38,33 +38,12 @@ USEFUL REFERENCE:
 """
 
 from datetime import datetime, timezone
-
-from sqlalchemy import create_engine, String, Text, DateTime
+from sqlalchemy import create_engine, func, DateTime, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-
-DATABASE_URL = "sqlite:///./messenger.db"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, echo=False)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-
-
-def get_db():
-    """
-    FastAPI dependency — opens a DB session for one request, closes it after.
-    You don't need to change this. Just use it in your routes:
-        def my_route(db: Session = Depends(get_db)):
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
+# 1. הגדרת ה-Base - ממנו יורשות כל הטבלאות
 class Base(DeclarativeBase):
     pass
-
 
 # ---------------------------------------------------------------------------
 # TODO 1 — Define the User table
@@ -72,8 +51,15 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    # your columns here
-
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    # חותמת זמן ליצירת המשתמש
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        default=lambda: datetime.now(timezone.utc)
+    )
 
 # ---------------------------------------------------------------------------
 # TODO 2 — Define the Message table
@@ -81,8 +67,39 @@ class User(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    # your columns here
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sender: Mapped[str] = mapped_column(String(50), nullable=False)
+    recipient: Mapped[str] = mapped_column(String(50), nullable=False)
+    ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # חותמת זמן למשלוח ההודעה (חשוב מאוד ל-Stage 2 של ה-Realtime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now()
+    )
 
+# ---------------------------------------------------------------------------
+# Database Configuration
+# ---------------------------------------------------------------------------
+DATABASE_URL = "sqlite:///./messenger.db"
+
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"check_same_thread": False}, 
+    echo=False
+)
+
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+def get_db():
+    """
+    FastAPI dependency — opens a DB session for one request, closes it after.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def create_tables():
     """Creates all tables in the database if they don't exist yet."""

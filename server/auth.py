@@ -90,11 +90,16 @@ _bearer = HTTPBearer()
 # ---------------------------------------------------------------------------
 def hash_password(plain: str) -> str:
     """
-    Return a bcrypt hash of the password.
-    This is what gets stored in the database — never the plain text.
+    הופך סיסמה גלויה ל-Hash מאובטח באמצעות bcrypt.
+    מייצר Salt רנדומלי לכל סיסמה כדי למנוע התקפות Rainbow Table.
     """
-    # your code here
-    pass
+    # המרת הטקסט לבייטים (Bytes) לצורך עבודה עם bcrypt
+    pwd_bytes = plain.encode('utf-8')
+    # יצירת מלח (Salt) וביצוע Hashing
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(pwd_bytes, salt)
+    # החזרה כמחרוזת (String) לצורך שמירה ב-Database
+    return hashed_password.decode('utf-8')
 
 
 # ---------------------------------------------------------------------------
@@ -102,11 +107,10 @@ def hash_password(plain: str) -> str:
 # ---------------------------------------------------------------------------
 def verify_password(plain: str, hashed: str) -> bool:
     """
-    Return True if the plain password matches the stored hash.
-    Used at login time.
+    בודק האם סיסמה שהוזנה תואמת ל-Hash ששמור בבסיס הנתונים.
     """
-    # your code here
-    pass
+    # המרת שני הערכים לבייטים לצורך השוואה בטוחה
+    return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
 
 
 # ---------------------------------------------------------------------------
@@ -114,12 +118,20 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ---------------------------------------------------------------------------
 def create_token(username: str) -> str:
     """
-    Build a JWT payload with the username and an expiry time,
-    then sign and return it as a string.
-    Hint: use TOKEN_EXPIRE_HOURS and datetime.now(timezone.utc).
+    מייצר Payload שכולל את שם המשתמש וזמן תפוגה, וחותם אותו עם SECRET_KEY.
     """
-    # your code here
-    pass
+    # קביעת זמן התפוגה
+    expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
+    
+    # בניית גוף ההודעה (Payload) - "sub" הוא הסטנדרט לשם המשתמש/מזהה
+    to_encode = {
+        "sub": username,
+        "exp": expire
+    }
+    
+    # חתימת ה-Token
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 
 # ---------------------------------------------------------------------------
@@ -127,11 +139,20 @@ def create_token(username: str) -> str:
 # ---------------------------------------------------------------------------
 def decode_token(token: str) -> Optional[str]:
     """
-    Decode the token and return the username ("sub" field).
-    Return None if the token is invalid or expired — do not raise.
+    מפענח את ה-Token ובודק את תקינות החתימה והתפוגה.
+    מחזיר את שם המשתמש (sub) במידה ותקין, אחרת None.
     """
-    # your code here
-    pass
+    try:
+        # הפענוח בודק אוטומטית את החתימה ואת זמן התפוגה (exp)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        
+        if username is None:
+            return None
+        return username
+    except JWTError:
+        # אם ה-Token פג תוקף או שונה ע"י גורם זר, תיזרק שגיאה
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -139,12 +160,21 @@ def decode_token(token: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> str:
     """
-    Extract the Bearer token from the Authorization header,
-    validate it with decode_token(), and return the username.
-    Raise HTTP 401 if the token is missing, invalid, or expired.
-
-    Usage in a route:
-        def my_route(username: str = Depends(require_auth)):
+    Dependency שמוודא קיום Token תקף ב-Header של הבקשה.
+    אם הטוקן לא תקין, זורק שגיאת 401 ועוצר את המשך הבקשה.
     """
-    # your code here
-    pass
+    # חילוץ מחרוזת ה-Token מתוך ה-Bearer
+    token = credentials.credentials
+    
+    # ניסיון פענוח
+    username = decode_token(token)
+    
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # החזרת שם המשתמש שישמש את ה-Route
+    return username
