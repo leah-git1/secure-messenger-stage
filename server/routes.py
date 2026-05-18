@@ -61,7 +61,11 @@ USEFUL PATTERN — how to save a new row:
 """
 
 import logging
+import asyncio
+import json
+from asyncio import Queue
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from .models import User, Message, get_db
@@ -74,6 +78,33 @@ from .crypto import encrypt, decrypt
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+
+# ───────────────────────────────────────────────────────────────────────
+# STAGE 2: Real-time SSE Broadcasting System
+# ───────────────────────────────────────────────────────────────────────
+# A dictionary mapping username -> set of asyncio Queues
+# When a message is sent to a user, we push it to all their open /stream queues
+_active_clients: dict[str, set[Queue]] = {}
+
+
+async def _broadcast_message(recipient: str, message_data: dict) -> None:
+    """
+    Push a message to all active SSE clients listening for this recipient.
+    """
+    if recipient not in _active_clients:
+        return
+    
+    disconnected_queues = set()
+    for queue in _active_clients[recipient]:
+        try:
+            await queue.put(message_data)
+        except asyncio.CancelledError:
+            disconnected_queues.add(queue)
+    
+    # Clean up disconnected clients
+    _active_clients[recipient] -= disconnected_queues
+    if not _active_clients[recipient]:
+        del _active_clients[recipient]
 
 # ---------------------------------------------------------------------------
 # TODO 1 — Register a new user
@@ -135,7 +166,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 # TODO 3 — Send a message (authenticated)
 # ---------------------------------------------------------------------------
 @router.post("/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def send_message(
+async def send_message(
     body: SendMessageRequest,
     db: Session = Depends(get_db),
     username: str = Depends(require_auth),
@@ -156,7 +187,17 @@ def send_message(
     db.commit()
     db.refresh(new_message)
 
-    # 3. החזרת ההודעה עם תוכן מפוענח לצורך תצוגה מיידית למשתמש השולח
+    # 3. STAGE 2: Broadcast the message to recipient's SSE clients
+    message_event = {
+        "id": new_message.id,
+        "sender": new_message.sender,
+        "recipient": new_message.recipient,
+        "content": body.content,
+        "created_at": new_message.created_at.isoformat(),
+    }
+    await _broadcast_message(body.recipient, message_event)
+
+    # 4. החזרת ההודעה עם תוכן מפוענח לצורך תצוגה מיידית למשתמש השולח
     return MessageResponse(
         id=new_message.id,
         sender=new_message.sender,
@@ -200,3 +241,60 @@ def get_messages(
             continue
 
     return decrypted_messages
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# STAGE 2: Server-Sent Events (SSE) endpoint for real-time messages
+# ═════════════════════════════════════════════════════════════════════════
+# This endpoint opens a persistent connection that stays open.
+# The client cts with: GET /stream?token=<jwt_token>
+# Then it listens silently until a new message arrives.
+# When Alice sends a message to Bob, Bob's /stream immediately receives it.
+
+@router.get("/stream")
+async def stream_messages(username: str = Depends(require_auth)):
+    """
+    Server-Sent Events (SSE) endpoint.
+    
+    The client opens this connection and keeps it open.
+    When a new message arrives for this user, it is pushed through this connection.
+    
+    Usage from client:
+        GET http://localhost:8000/stream?token=<JWT_TOKEN>
+    """
+    # Create a queue for this client
+    queue: Queue = Queue()
+    
+    # Register this client
+    if username not in _active_clients:
+        _active_clients[username] = set()
+    _active_clients[username].add(queue)
+    
+    log.info(f"SSE client connected: {username}")
+    
+    async def event_generator():
+        try:
+            while True:
+                # Wait for a message to arrive in the queue
+                message_data = await queue.get()
+                
+                # Send it as a Server-Sent Event
+                yield f"data: {json.dumps(message_data)}\n\n"
+                log.info(f"SSE message sent to {username}: {message_data['id']}")
+        except asyncio.CancelledError:
+            log.info(f"SSE client disconnected: {username}")
+            # Remove this queue from active clients
+            if username in _active_clients:
+                _active_clients[username].discard(queue)
+                if not _active_clients[username]:
+                    del _active_clients[username]
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
