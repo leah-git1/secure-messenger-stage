@@ -40,6 +40,19 @@ secure-messenger-stage1/
 
 ---
 
+## 📸 Screenshots
+
+### Login & Register
+![Login screen](assets/login.png)
+
+### Chat
+![Chat screen](assets/chat.png)
+
+### Multiple Users in Real-Time
+![Multi-user chat](assets/multi-user.png)
+
+---
+
 ## ⚙️ Setup
 
 ### 1. Create Virtual Environment
