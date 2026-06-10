@@ -1,701 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secure Messenger</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Secure Messenger</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+/* ── AUTH ── */
+#auth-screen{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#auth-screen h1{font-size:1.6rem;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#64748b;font-size:.85rem;margin-bottom:28px}
+.tab-row{display:flex;gap:8px;margin-bottom:24px}
+.tab-btn{flex:1;padding:9px;border:1px solid #2d3148;border-radius:8px;background:transparent;color:#64748b;cursor:pointer;font-size:.9rem;transition:all .2s}
+.tab-btn.active{background:#6366f1;border-color:#6366f1;color:#fff;font-weight:600}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:6px;font-weight:500}
+.field input{width:100%;padding:10px 14px;background:#0f1117;border:1px solid #2d3148;border-radius:8px;color:#e2e8f0;font-size:.95rem;outline:none;transition:border-color .2s}
+.field input:focus{border-color:#6366f1}
+.btn-primary{width:100%;padding:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;color:#fff;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:4px;transition:opacity .2s}
+.btn-primary:hover{opacity:.88}
+#auth-error{margin-top:14px;padding:10px 14px;background:#2d1515;border:1px solid #7f1d1d;border-radius:8px;color:#fca5a5;font-size:.85rem;display:none}
 
-    /* ── AUTH SCREEN ── */
-    #auth-screen {
-      background: #1a1d27;
-      border: 1px solid #2d3148;
-      border-radius: 16px;
-      padding: 40px;
-      width: 380px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    }
+/* ── CHAT ── */
+#chat-screen{display:none;width:100vw;height:100vh;flex-direction:row}
+#sidebar{width:264px;background:#1a1d27;border-right:1px solid #2d3148;display:flex;flex-direction:column;flex-shrink:0}
+#sidebar-header{padding:20px 16px 14px;border-bottom:1px solid #2d3148}
+#sidebar-header h2{font-size:1rem;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#logged-in-as{font-size:.75rem;color:#64748b;margin-top:3px}
+#new-chat-row{padding:12px 16px;border-bottom:1px solid #2d3148;display:flex;gap:8px}
+#new-chat-input{flex:1;padding:7px 10px;background:#0f1117;border:1px solid #2d3148;border-radius:7px;color:#e2e8f0;font-size:.85rem;outline:none}
+#new-chat-input:focus{border-color:#6366f1}
+#new-chat-btn{padding:7px 13px;background:#6366f1;border:none;border-radius:7px;color:#fff;font-size:1rem;cursor:pointer;font-weight:700}
+#conversations{flex:1;overflow-y:auto;padding:8px 0}
+.conv-item{padding:10px 16px;cursor:pointer;border-radius:8px;margin:2px 8px;display:flex;align-items:center;gap:10px;transition:background .15s}
+.conv-item:hover{background:#252836}
+.conv-item.active{background:#2d3148}
+.conv-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+.conv-info{flex:1;min-width:0}
+.conv-name{font-size:.9rem;font-weight:500}
+.conv-preview{font-size:.75rem;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv-badge{background:#6366f1;color:#fff;border-radius:10px;padding:2px 7px;font-size:.7rem;font-weight:700;flex-shrink:0;display:none}
+#logout-btn{margin:12px;padding:9px;background:transparent;border:1px solid #2d3148;border-radius:8px;color:#64748b;cursor:pointer;font-size:.85rem;transition:all .2s}
+#logout-btn:hover{border-color:#ef4444;color:#ef4444}
 
-    #auth-screen h1 {
-      font-size: 1.6rem;
-      font-weight: 700;
-      margin-bottom: 6px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    #auth-screen p.subtitle {
-      color: #64748b;
-      font-size: 0.85rem;
-      margin-bottom: 28px;
-    }
-
-    .tab-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 24px;
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 9px;
-      border: 1px solid #2d3148;
-      border-radius: 8px;
-      background: transparent;
-      color: #64748b;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: all 0.2s;
-    }
-
-    .tab-btn.active {
-      background: #6366f1;
-      border-color: #6366f1;
-      color: #fff;
-      font-weight: 600;
-    }
-
-    .field { margin-bottom: 16px; }
-
-    .field label {
-      display: block;
-      font-size: 0.8rem;
-      color: #94a3b8;
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .field input {
-      width: 100%;
-      padding: 10px 14px;
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      border-radius: 8px;
-      color: #e2e8f0;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    .field input:focus { border-color: #6366f1; }
-
-    .btn-primary {
-      width: 100%;
-      padding: 11px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border: none;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 4px;
-      transition: opacity 0.2s;
-    }
-
-    .btn-primary:hover { opacity: 0.88; }
-
-    #auth-error {
-      margin-top: 14px;
-      padding: 10px 14px;
-      background: #2d1515;
-      border: 1px solid #7f1d1d;
-      border-radius: 8px;
-      color: #fca5a5;
-      font-size: 0.85rem;
-      display: none;
-    }
-
-    /* ── CHAT SCREEN ── */
-    #chat-screen {
-      display: none;
-      width: 100vw;
-      height: 100vh;
-      flex-direction: row;
-    }
-
-    /* sidebar */
-    #sidebar {
-      width: 260px;
-      background: #1a1d27;
-      border-right: 1px solid #2d3148;
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
-
-    #sidebar-header {
-      padding: 20px 16px 14px;
-      border-bottom: 1px solid #2d3148;
-    }
-
-    #sidebar-header h2 {
-      font-size: 1rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    #logged-in-as {
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-top: 3px;
-    }
-
-    #new-chat-row {
-      padding: 12px 16px;
-      border-bottom: 1px solid #2d3148;
-      display: flex;
-      gap: 8px;
-    }
-
-    #new-chat-row input {
-      flex: 1;
-      padding: 7px 10px;
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      border-radius: 7px;
-      color: #e2e8f0;
-      font-size: 0.85rem;
-      outline: none;
-    }
-
-    #new-chat-row input:focus { border-color: #6366f1; }
-
-    #new-chat-row button {
-      padding: 7px 12px;
-      background: #6366f1;
-      border: none;
-      border-radius: 7px;
-      color: #fff;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-
-    #conversations { flex: 1; overflow-y: auto; padding: 8px 0; }
-
-    .conv-item {
-      padding: 10px 16px;
-      cursor: pointer;
-      border-radius: 8px;
-      margin: 2px 8px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: background 0.15s;
-    }
-
-    .conv-item:hover { background: #252836; }
-    .conv-item.active { background: #2d3148; }
-
-    .conv-avatar {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.85rem;
-      flex-shrink: 0;
-    }
-
-    .conv-name { font-size: 0.9rem; font-weight: 500; }
-
-    .conv-unread {
-      margin-left: auto;
-      background: #6366f1;
-      color: #fff;
-      border-radius: 10px;
-      padding: 1px 7px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      display: none;
-    }
-
-    #logout-btn {
-      margin: 12px;
-      padding: 9px;
-      background: transparent;
-      border: 1px solid #2d3148;
-      border-radius: 8px;
-      color: #64748b;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-    }
-
-    #logout-btn:hover { border-color: #ef4444; color: #ef4444; }
-
-    /* main chat area */
-    #chat-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #0f1117;
-    }
-
-    #chat-header {
-      padding: 16px 24px;
-      border-bottom: 1px solid #2d3148;
-      background: #1a1d27;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    #chat-header-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.9rem;
-    }
-
-    #chat-header-name { font-weight: 600; font-size: 1rem; }
-
-    #online-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      margin-left: auto;
-    }
-
-    #messages-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    #no-chat-placeholder {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #334155;
-      gap: 12px;
-    }
-
-    #no-chat-placeholder svg { opacity: 0.3; }
-    #no-chat-placeholder p { font-size: 0.95rem; }
-
-    .msg-row {
-      display: flex;
-      flex-direction: column;
-      max-width: 68%;
-    }
-
-    .msg-row.mine { align-self: flex-end; align-items: flex-end; }
-    .msg-row.theirs { align-self: flex-start; align-items: flex-start; }
-
-    .msg-bubble {
-      padding: 10px 14px;
-      border-radius: 16px;
-      font-size: 0.92rem;
-      line-height: 1.45;
-      word-break: break-word;
-    }
-
-    .msg-row.mine .msg-bubble {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      color: #fff;
-      border-bottom-right-radius: 4px;
-    }
-
-    .msg-row.theirs .msg-bubble {
-      background: #1e2130;
-      color: #e2e8f0;
-      border-bottom-left-radius: 4px;
-    }
-
-    .msg-time {
-      font-size: 0.7rem;
-      color: #475569;
-      margin-top: 4px;
-      padding: 0 4px;
-    }
-
-    /* input bar */
-    #input-bar {
-      padding: 16px 24px;
-      border-top: 1px solid #2d3148;
-      background: #1a1d27;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    #msg-input {
-      flex: 1;
-      padding: 11px 16px;
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      border-radius: 24px;
-      color: #e2e8f0;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    #msg-input:focus { border-color: #6366f1; }
-
-    #send-btn {
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: opacity 0.2s;
-    }
-
-    #send-btn:hover { opacity: 0.85; }
-    #send-btn svg { width: 18px; height: 18px; fill: #fff; }
-
-    /* scrollbar */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 4px; }
-
-    .hidden { display: none !important; }
-  </style>
+/* ── MAIN PANEL ── */
+#main-panel{flex:1;display:flex;flex-direction:column;background:#0f1117;min-width:0}
+#empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#334155;gap:14px}
+#empty-state p{font-size:.95rem}
+#chat-panel{display:none;flex:1;flex-direction:column;min-height:0}
+#chat-header{padding:14px 24px;border-bottom:1px solid #2d3148;background:#1a1d27;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#chat-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+#chat-name{font-weight:600;font-size:1rem}
+#messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:10px}
+.day-sep{text-align:center;font-size:.72rem;color:#334155;margin:8px 0}
+.msg-row{display:flex;flex-direction:column;max-width:66%}
+.msg-row.mine{align-self:flex-end;align-items:flex-end}
+.msg-row.theirs{align-self:flex-start;align-items:flex-start}
+.bubble{padding:10px 14px;border-radius:16px;font-size:.92rem;line-height:1.45;word-break:break-word;white-space:pre-wrap}
+.mine .bubble{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-bottom-right-radius:4px}
+.theirs .bubble{background:#1e2130;color:#e2e8f0;border-bottom-left-radius:4px}
+.msg-meta{font-size:.7rem;color:#475569;margin-top:3px;padding:0 4px}
+#input-bar{padding:14px 24px;border-top:1px solid #2d3148;background:#1a1d27;display:flex;gap:10px;align-items:center;flex-shrink:0}
+#msg-input{flex:1;padding:11px 16px;background:#0f1117;border:1px solid #2d3148;border-radius:24px;color:#e2e8f0;font-size:.95rem;outline:none;transition:border-color .2s}
+#msg-input:focus{border-color:#6366f1}
+#send-btn{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s}
+#send-btn:hover{opacity:.85}
+#send-btn svg{width:18px;height:18px;fill:#fff}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#2d3148;border-radius:4px}
+</style>
 </head>
 <body>
 
-<!-- ═══════════════════════════ AUTH SCREEN ═══════════════════════════ -->
+<!-- AUTH -->
 <div id="auth-screen">
   <h1>Secure Messenger</h1>
-  <p class="subtitle">End-to-end encrypted · Real-time</p>
-
+  <p class="subtitle">End-to-end encrypted · Real-time SSE</p>
   <div class="tab-row">
-    <button class="tab-btn active" id="tab-login" onclick="showTab('login')">Login</button>
-    <button class="tab-btn" id="tab-register" onclick="showTab('register')">Register</button>
+    <button class="tab-btn active" id="tab-login"     onclick="setTab('login')">Login</button>
+    <button class="tab-btn"        id="tab-register"  onclick="setTab('register')">Register</button>
   </div>
-
-  <div class="field">
-    <label>Username</label>
-    <input id="auth-username" type="text" placeholder="alice" autocomplete="off" />
-  </div>
-  <div class="field">
-    <label>Password</label>
-    <input id="auth-password" type="password" placeholder="••••••••" />
-  </div>
-
+  <div class="field"><label>Username</label><input id="a-user" type="text" placeholder="alice" autocomplete="off"/></div>
+  <div class="field"><label>Password</label><input id="a-pass" type="password" placeholder="••••••••"/></div>
   <button class="btn-primary" onclick="submitAuth()">Continue</button>
   <div id="auth-error"></div>
 </div>
 
-<!-- ═══════════════════════════ CHAT SCREEN ═══════════════════════════ -->
+<!-- CHAT -->
 <div id="chat-screen">
-
-  <!-- sidebar -->
   <div id="sidebar">
     <div id="sidebar-header">
       <h2>Secure Messenger</h2>
       <div id="logged-in-as"></div>
     </div>
-
     <div id="new-chat-row">
-      <input id="new-chat-input" type="text" placeholder="Open chat with..." />
-      <button onclick="openChat()">+</button>
+      <input id="new-chat-input" placeholder="Start chat with..." onkeydown="if(event.key==='Enter')openChat()"/>
+      <button id="new-chat-btn" onclick="openChat()">+</button>
     </div>
-
     <div id="conversations"></div>
-
     <button id="logout-btn" onclick="logout()">Sign out</button>
   </div>
 
-  <!-- main area — placeholder when no chat selected -->
-  <div id="no-chat-placeholder">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-    <p>Select a conversation or start a new one</p>
-  </div>
-
-  <!-- main area — active chat -->
-  <div id="chat-main" class="hidden">
-    <div id="chat-header">
-      <div id="chat-header-avatar"></div>
-      <div id="chat-header-name"></div>
-      <div id="online-dot" class="hidden"></div>
+  <div id="main-panel">
+    <div id="empty-state">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.2" opacity=".35">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <p>Pick a conversation or type a username above</p>
     </div>
-
-    <div id="messages-area"></div>
-
-    <div id="input-bar">
-      <input id="msg-input" type="text" placeholder="Type a message..." autocomplete="off"
-             onkeydown="if(event.key==='Enter') sendMessage()" />
-      <button id="send-btn" onclick="sendMessage()">
-        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-      </button>
+    <div id="chat-panel">
+      <div id="chat-header">
+        <div id="chat-avatar"></div>
+        <div id="chat-name"></div>
+      </div>
+      <div id="messages"></div>
+      <div id="input-bar">
+        <input id="msg-input" placeholder="Type a message…" autocomplete="off"
+               onkeydown="if(event.key==='Enter')sendMsg()"/>
+        <button id="send-btn" onclick="sendMsg()">
+          <svg viewBox="0 0 24 24"><path d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
     </div>
   </div>
-
 </div>
 
 <script>
-  const API = '';   // same origin
-  let token = null;
-  let me = null;
-  let activeChat = null;
-  let eventSource = null;
-  // username -> array of message objects
-  const conversations = {};
-  // username -> unread count
-  const unread = {};
+// ── state ──────────────────────────────────────────────────────────────
+let token = null, me = null, active = null, es = null;
+// peer -> [{id,sender,recipient,content,created_at}]
+const convos = {};
+// peer -> unread count
+const badges = {};
+// set of message ids already in convos (dedup)
+const seen = new Set();
 
-  // ── AUTH ──────────────────────────────────────────────────────────────
+// ── auth ───────────────────────────────────────────────────────────────
+let currentTab = 'login';
+function setTab(t) {
+  currentTab = t;
+  document.getElementById('tab-login').classList.toggle('active', t==='login');
+  document.getElementById('tab-register').classList.toggle('active', t==='register');
+  document.getElementById('auth-error').style.display = 'none';
+}
 
-  function showTab(tab) {
-    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
-    document.getElementById('auth-error').style.display = 'none';
-    document.getElementById('auth-username').dataset.tab = tab;
-  }
-
-  document.getElementById('auth-username').dataset.tab = 'login';
-
-  async function submitAuth() {
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const tab = document.getElementById('auth-username').dataset.tab;
-    const errEl = document.getElementById('auth-error');
-    errEl.style.display = 'none';
-
-    if (!username || !password) { showError('Fill in both fields.'); return; }
-
-    try {
-      if (tab === 'register') {
-        const r = await fetch(`${API}/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password }),
-        });
-        if (!r.ok) { showError((await r.json()).detail || 'Registration failed'); return; }
-      }
-
-      const r = await fetch(`${API}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      if (!r.ok) { showError((await r.json()).detail || 'Login failed'); return; }
-
-      const data = await r.json();
-      token = data.access_token;
-      me = username;
-      enterChat();
-    } catch (e) {
-      showError('Cannot reach server. Is it running?');
+async function submitAuth() {
+  const user = document.getElementById('a-user').value.trim();
+  const pass = document.getElementById('a-pass').value;
+  if (!user || !pass) { showErr('Fill in both fields.'); return; }
+  try {
+    if (currentTab === 'register') {
+      const r = await api('/register','POST',{username:user,password:pass});
+      if (!r.ok) { showErr((await r.json()).detail||'Registration failed'); return; }
     }
-  }
+    const r = await api('/login','POST',{username:user,password:pass});
+    if (!r.ok) { showErr((await r.json()).detail||'Login failed'); return; }
+    const d = await r.json();
+    token = d.access_token; me = user;
+    enterChat();
+  } catch(e) { showErr('Cannot reach server — is it running?'); }
+}
 
-  function showError(msg) {
-    const el = document.getElementById('auth-error');
-    el.textContent = msg;
-    el.style.display = 'block';
-  }
+function showErr(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+}
 
-  // ── CHAT INIT ─────────────────────────────────────────────────────────
+// ── enter chat ─────────────────────────────────────────────────────────
+async function enterChat() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('chat-screen').style.display = 'flex';
+  document.getElementById('logged-in-as').textContent = '@' + me;
+  await loadHistory();
+  startSSE();
+}
 
-  async function enterChat() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('chat-screen').style.display = 'flex';
-    document.getElementById('logged-in-as').textContent = '@' + me;
+async function loadHistory() {
+  const r = await api('/messages','GET');
+  if (!r.ok) return;
+  const msgs = await r.json();
+  msgs.forEach(ingestMsg);
+  renderSidebar();
+  if (active) renderMessages();
+}
 
-    await loadHistory();
-    startSSE();
-  }
+function ingestMsg(msg) {
+  if (seen.has(msg.id)) return;   // dedup
+  seen.add(msg.id);
+  const peer = msg.sender === me ? msg.recipient : msg.sender;
+  if (!convos[peer]) convos[peer] = [];
+  convos[peer].push(msg);
+  convos[peer].sort((a,b) => new Date(a.created_at)-new Date(b.created_at));
+}
 
-  async function loadHistory() {
-    const r = await fetch(`${API}/messages`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!r.ok) return;
-    const msgs = await r.json();
-    msgs.forEach(addMessageToConv);
-    renderSidebar();
-    // re-render active chat if open
-    if (activeChat) renderMessages(activeChat);
-  }
-
-  function addMessageToConv(msg) {
+// ── SSE ────────────────────────────────────────────────────────────────
+function startSSE() {
+  if (es) es.close();
+  es = new EventSource(`/stream?token=${token}`);
+  es.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    ingestMsg(msg);
     const peer = msg.sender === me ? msg.recipient : msg.sender;
-    if (!conversations[peer]) conversations[peer] = [];
-    // avoid duplicates by id
-    if (!conversations[peer].find(m => m.id === msg.id)) {
-      conversations[peer].push(msg);
-      conversations[peer].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    }
-  }
-
-  // ── SSE ───────────────────────────────────────────────────────────────
-
-  function startSSE() {
-    if (eventSource) eventSource.close();
-    // SSE needs the token — pass via query param since EventSource can't set headers
-    eventSource = new EventSource(`${API}/stream?token=${token}`);
-    eventSource.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      addMessageToConv(msg);
-      const peer = msg.sender === me ? msg.recipient : msg.sender;
-      if (peer === activeChat) {
-        renderMessages(activeChat);
-        scrollToBottom();
-      } else {
-        unread[peer] = (unread[peer] || 0) + 1;
-        renderSidebar();
-        // flash title
-        document.title = `(${unread[peer]}) New message from ${peer}`;
-        setTimeout(() => { document.title = 'Secure Messenger'; }, 3000);
-      }
-    };
-    eventSource.onerror = () => {
-      // auto-reconnect is built into EventSource; just log
-      console.warn('SSE connection lost, browser will retry...');
-    };
-  }
-
-  // ── SIDEBAR ───────────────────────────────────────────────────────────
-
-  function renderSidebar() {
-    const el = document.getElementById('conversations');
-    const peers = Object.keys(conversations);
-    el.innerHTML = peers.map(peer => {
-      const isActive = peer === activeChat;
-      const u = unread[peer] || 0;
-      const initial = peer[0].toUpperCase();
-      return `
-        <div class="conv-item ${isActive ? 'active' : ''}" onclick="selectChat('${peer}')">
-          <div class="conv-avatar">${initial}</div>
-          <div class="conv-name">${peer}</div>
-          <div class="conv-unread" style="display:${u > 0 ? 'block' : 'none'}">${u}</div>
-        </div>`;
-    }).join('');
-  }
-
-  function openChat() {
-    const peer = document.getElementById('new-chat-input').value.trim().toLowerCase();
-    if (!peer || peer === me) return;
-    document.getElementById('new-chat-input').value = '';
-    if (!conversations[peer]) conversations[peer] = [];
     renderSidebar();
-    selectChat(peer);
-  }
-
-  function selectChat(peer) {
-    activeChat = peer;
-    unread[peer] = 0;
-
-    document.getElementById('no-chat-placeholder').style.display = 'none';
-    document.getElementById('chat-main').classList.remove('hidden');
-
-    document.getElementById('chat-header-avatar').textContent = peer[0].toUpperCase();
-    document.getElementById('chat-header-name').textContent = peer;
-
-    renderSidebar();
-    renderMessages(peer);
-    scrollToBottom();
-    document.getElementById('msg-input').focus();
-  }
-
-  // ── MESSAGES ──────────────────────────────────────────────────────────
-
-  function renderMessages(peer) {
-    const area = document.getElementById('messages-area');
-    const msgs = conversations[peer] || [];
-    area.innerHTML = msgs.map(msg => {
-      const mine = msg.sender === me;
-      const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="msg-row ${mine ? 'mine' : 'theirs'}">
-          <div class="msg-bubble">${escHtml(msg.content)}</div>
-          <div class="msg-time">${time}</div>
-        </div>`;
-    }).join('');
-    scrollToBottom();
-  }
-
-  function scrollToBottom() {
-    const area = document.getElementById('messages-area');
-    area.scrollTop = area.scrollHeight;
-  }
-
-  async function sendMessage() {
-    const input = document.getElementById('msg-input');
-    const content = input.value.trim();
-    if (!content || !activeChat) return;
-    input.value = '';
-
-    const r = await fetch(`${API}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ content, recipient: activeChat }),
-    });
-
-    if (r.ok) {
-      const msg = await r.json();
-      addMessageToConv(msg);
-      renderMessages(activeChat);
-      scrollToBottom();
+    if (peer === active) {
+      renderMessages();
+    } else {
+      badges[peer] = (badges[peer]||0) + 1;
+      renderSidebar();
+      document.title = `(${badges[peer]}) ${peer} — Secure Messenger`;
+      setTimeout(()=>{ document.title='Secure Messenger'; }, 4000);
     }
-  }
+  };
+  es.onerror = () => console.warn('SSE reconnecting…');
+}
 
-  // ── MISC ──────────────────────────────────────────────────────────────
-
-  function logout() {
-    if (eventSource) eventSource.close();
-    token = null; me = null; activeChat = null;
-    Object.keys(conversations).forEach(k => delete conversations[k]);
-    Object.keys(unread).forEach(k => delete unread[k]);
-    document.getElementById('chat-screen').style.display = 'none';
-    document.getElementById('auth-screen').style.display = 'block';
-    document.getElementById('auth-password').value = '';
-    document.getElementById('auth-error').style.display = 'none';
-  }
-
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-  }
-
-  // allow Enter key on auth form
-  document.getElementById('auth-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitAuth();
+// ── sidebar ────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const el = document.getElementById('conversations');
+  const peers = Object.keys(convos);
+  // sort by latest message
+  peers.sort((a,b) => {
+    const la = convos[a].at(-1)?.created_at||'';
+    const lb = convos[b].at(-1)?.created_at||'';
+    return lb.localeCompare(la);
   });
-</script>
+  el.innerHTML = peers.map(peer => {
+    const last = convos[peer].at(-1);
+    const preview = last ? escHtml(last.content.slice(0,32)) : '';
+    const badge = badges[peer]||0;
+    return `<div class="conv-item${peer===active?' active':''}" onclick="selectChat('${peer}')">
+      <div class="conv-avatar">${peer[0].toUpperCase()}</div>
+      <div class="conv-info">
+        <div class="conv-name">${escHtml(peer)}</div>
+        <div class="conv-preview">${preview}</div>
+      </div>
+      <div class="conv-badge" style="display:${badge?'block':'none'}">${badge}</div>
+    </div>`;
+  }).join('');
+}
 
-<!-- SSE token-in-query-param support: patch require_auth to also read ?token -->
+function openChat() {
+  const inp = document.getElementById('new-chat-input');
+  const peer = inp.value.trim().toLowerCase();
+  inp.value = '';
+  if (!peer || peer === me) return;
+  if (!convos[peer]) convos[peer] = [];
+  renderSidebar();
+  selectChat(peer);
+}
+
+function selectChat(peer) {
+  active = peer;
+  badges[peer] = 0;
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('chat-panel').style.display = 'flex';
+  document.getElementById('chat-panel').style.flexDirection = 'column';
+  document.getElementById('chat-avatar').textContent = peer[0].toUpperCase();
+  document.getElementById('chat-name').textContent = peer;
+  renderSidebar();
+  renderMessages();
+  document.getElementById('msg-input').focus();
+}
+
+// ── messages ───────────────────────────────────────────────────────────
+function renderMessages() {
+  const area = document.getElementById('messages');
+  const msgs = convos[active] || [];
+  area.innerHTML = msgs.map(m => {
+    const mine = m.sender === me;
+    const t = new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const senderLabel = !mine ? `<div style="font-size:.7rem;color:#6366f1;margin-bottom:3px">${escHtml(m.sender)}</div>` : '';
+    return `<div class="msg-row ${mine?'mine':'theirs'}">
+      ${senderLabel}
+      <div class="bubble">${escHtml(m.content)}</div>
+      <div class="msg-meta">${t}</div>
+    </div>`;
+  }).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('msg-input');
+  const content = inp.value.trim();
+  if (!content || !active) return;
+  inp.value = '';
+  // Optimistically add (SSE will also deliver it back; dedup by id handles it)
+  const r = await api('/messages','POST',{content, recipient:active});
+  if (!r.ok) { inp.value = content; return; }
+  // Don't manually add — the server publishes to sender's SSE too, so it arrives via SSE
+}
+
+// ── helpers ────────────────────────────────────────────────────────────
+async function api(path, method, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body)  opts.body = JSON.stringify(body);
+  return fetch(path, opts);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function logout() {
+  if (es) es.close();
+  token=null; me=null; active=null; es=null;
+  Object.keys(convos).forEach(k=>delete convos[k]);
+  Object.keys(badges).forEach(k=>delete badges[k]);
+  seen.clear();
+  document.getElementById('chat-screen').style.display = 'none';
+  document.getElementById('chat-panel').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('auth-screen').style.display = 'block';
+  document.getElementById('a-pass').value = '';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+document.getElementById('a-pass').addEventListener('keydown', e => {
+  if (e.key==='Enter') submitAuth();
+});
+</script>
 </body>
 </html>

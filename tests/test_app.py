@@ -328,20 +328,22 @@ class TestSSE:
         alice_received = []
         bob_received   = []
 
-        def listen(token, bucket):
+        def listen(token, bucket, target_content):
             try:
                 with _httpx.stream("GET", f"{base}/stream",
                                    headers={"Authorization": f"Bearer {token}"},
                                    timeout=10) as r:
                     for line in r.iter_lines():
                         if line.startswith("data: "):
-                            bucket.append(_json.loads(line[6:]))
-                            break
+                            msg = _json.loads(line[6:])
+                            bucket.append(msg)
+                            if msg["content"] == target_content:
+                                break  # got the one we care about
             except (_httpx.ReadTimeout, _httpx.RemoteProtocolError):
                 pass
 
-        ta = threading.Thread(target=listen, args=(alice_token, alice_received), daemon=True)
-        tb = threading.Thread(target=listen, args=(bob_token,   bob_received),   daemon=True)
+        ta = threading.Thread(target=listen, args=(alice_token, alice_received, "hi t3_alice"), daemon=True)
+        tb = threading.Thread(target=listen, args=(bob_token,   bob_received,   "hi t3_bob"),   daemon=True)
         ta.start(); tb.start()
         time.sleep(0.4)
 
@@ -352,8 +354,8 @@ class TestSSE:
                     json={"content": "hi t3_bob", "recipient": "t3_bob"},
                     headers={"Authorization": f"Bearer {alice_token}"})
 
-        ta.join(timeout=5)
-        tb.join(timeout=5)
+        ta.join(timeout=6)
+        tb.join(timeout=6)
 
         assert any(m["content"] == "hi t3_alice" for m in alice_received)
         assert any(m["content"] == "hi t3_bob"   for m in bob_received)

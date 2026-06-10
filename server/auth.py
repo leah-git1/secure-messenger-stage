@@ -82,7 +82,7 @@ SECRET_KEY = "change-this-to-a-long-random-string-in-production"
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
-_bearer = HTTPBearer()
+_bearer = HTTPBearer(auto_error=False)  # False so query-param auth can also work
 
 
 # ---------------------------------------------------------------------------
@@ -159,33 +159,22 @@ def decode_token(token: str) -> Optional[str]:
 # TODO 5 — FastAPI dependency: enforce authentication on a route
 # ---------------------------------------------------------------------------
 def require_auth(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> str:
-    """
-    Dependency שמוודא קיום Token תקף ב-Header של הבקשה.
-    תומך גם בטוקן via query parameter (?token=...) לצורך SSE/EventSource.
-    אם הטוקן לא תקין, זורק שגיאת 401 ועוצר את המשך הבקשה.
-    """
-    # חילוץ מחרוזת ה-Token מתוך ה-Bearer
     token = credentials.credentials if credentials else None
-    
-    # ניסיון פענוח
     username = decode_token(token) if token else None
-    
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # החזרת שם המשתמש שישמש את ה-Route
     return username
 
 
 async def require_auth_with_query(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-    request: Request = None,
 ) -> str:
     """
     Enhanced auth dependency supporting both header and query parameter tokens.

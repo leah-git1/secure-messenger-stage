@@ -170,6 +170,9 @@ async def send_message(
         "created_at": new_message.created_at.isoformat(),
     }
     broadcaster.publish(body.recipient, message_event)
+    # also push to sender so their own tab updates instantly
+    if body.recipient != username:
+        broadcaster.publish(username, message_event)
 
     # 4. החזרת ההודעה עם תוכן מפוענח לצורך תצוגה מיידית למשתמש השולח
     return MessageResponse(
