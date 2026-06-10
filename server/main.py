@@ -16,13 +16,16 @@ This separation is the standard pattern in production FastAPI projects.
 HOW TO RUN:
   uvicorn server.main:app --reload
 
-  Then open: http://localhost:8000/docs
+  Then open: http://localhost:8000 (web UI) or http://localhost:8000/docs (API docs)
 """
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .models import create_tables
 from .routes import router
@@ -42,10 +45,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Secure Messenger — Stage 1",
-    description="Authenticated, encrypted REST API for private messaging",
-    version="1.0.0",
+    title="Secure Messenger — Stage 2",
+    description="Authenticated, encrypted real-time messaging with Server-Sent Events (SSE)",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
+# ── CORS middleware ────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict to your domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── API router (register first) ────────────────────────────────────────────
 app.include_router(router)
+
+# ── Serve static files (mount second, so /api routes take precedence) ──────
+static_path = Path(__file__).parent.parent / "static"
+if static_path.exists():
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")

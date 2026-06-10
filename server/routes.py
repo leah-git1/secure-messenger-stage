@@ -64,7 +64,7 @@ import logging
 import asyncio
 import json
 import queue as _queue
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -73,7 +73,7 @@ from .schemas import (
     RegisterRequest, LoginRequest, TokenResponse,
     SendMessageRequest, MessageResponse,
 )
-from .auth import hash_password, verify_password, create_token, require_auth
+from .auth import hash_password, verify_password, create_token, require_auth, require_auth_with_query
 from .crypto import encrypt, decrypt
 from . import broadcaster
 
@@ -226,12 +226,19 @@ def get_messages(
 # When Alice sends a message to Bob, Bob's /stream immediately receives it.
 
 @router.get("/stream")
-async def stream_messages(username: str = Depends(require_auth)):
+async def stream_messages(
+    request: Request,
+    username: str = Depends(require_auth_with_query),
+):
     """
     Server-Sent Events (SSE) endpoint.
     
     The client opens this connection and keeps it open.
     When a new message arrives for this user, it is pushed through this connection.
+    
+    Supports both:
+    - Authorization header: GET /stream with header: Authorization: Bearer <token>
+    - Query parameter: GET /stream?token=<token> (for JavaScript EventSource)
     
     Usage from client:
         GET http://localhost:8000/stream?token=<JWT_TOKEN>
@@ -262,3 +269,25 @@ async def stream_messages(username: str = Depends(require_auth)):
             "Connection": "keep-alive",
         }
     )
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# BONUS: User Presence Indicator (/users/online)
+# ═════════════════════════════════════════════════════════════════════════
+
+@router.get("/users/online", response_model=dict)
+def get_online_users(username: str = Depends(require_auth)):
+    """
+    Return list of currently connected users (those with active /stream connections).
+    
+    Example response:
+        {
+            "online_users": ["alice", "bob"],
+            "count": 2
+        }
+    """
+    online = broadcaster.online_users()
+    return {
+        "online_users": online,
+        "count": len(online),
+    }

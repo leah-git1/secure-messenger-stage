@@ -74,7 +74,7 @@ from typing import Optional
 
 import bcrypt
 from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
@@ -158,16 +158,19 @@ def decode_token(token: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # TODO 5 — FastAPI dependency: enforce authentication on a route
 # ---------------------------------------------------------------------------
-def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> str:
+def require_auth(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> str:
     """
     Dependency שמוודא קיום Token תקף ב-Header של הבקשה.
+    תומך גם בטוקן via query parameter (?token=...) לצורך SSE/EventSource.
     אם הטוקן לא תקין, זורק שגיאת 401 ועוצר את המשך הבקשה.
     """
     # חילוץ מחרוזת ה-Token מתוך ה-Bearer
-    token = credentials.credentials
+    token = credentials.credentials if credentials else None
     
     # ניסיון פענוח
-    username = decode_token(token)
+    username = decode_token(token) if token else None
     
     if not username:
         raise HTTPException(
@@ -177,4 +180,43 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -
         )
     
     # החזרת שם המשתמש שישמש את ה-Route
+    return username
+
+
+async def require_auth_with_query(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    request: Request = None,
+) -> str:
+    """
+    Enhanced auth dependency supporting both header and query parameter tokens.
+    Used for SSE endpoints where JavaScript EventSource can't set custom headers.
+    
+    Order of precedence:
+    1. Authorization header (Bearer token)
+    2. ?token=<jwt> query parameter
+    """
+    token = None
+    
+    # Try header first
+    if credentials:
+        token = credentials.credentials
+    # Try query parameter (for SSE/EventSource)
+    elif request:
+        token = request.query_params.get("token")
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    username = decode_token(token)
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     return username
