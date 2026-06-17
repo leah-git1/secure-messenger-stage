@@ -40,7 +40,10 @@ secure-messenger-stage1/
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshots & Demo
+
+### Demo
+![Demo](assets/demo.mp4)
 
 ### Login & Register
 ![Login screen](assets/login.png)
