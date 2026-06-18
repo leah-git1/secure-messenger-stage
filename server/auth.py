@@ -69,6 +69,7 @@ CONCEPT 3 — FASTAPI DEPENDENCY INJECTION
     Authorization: Bearer eyJhbGc...
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -78,7 +79,7 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
-SECRET_KEY = "change-this-to-a-long-random-string-in-production"
+SECRET_KEY = os.environ.get("JWT_SECRET", "change-this-to-a-long-random-string-in-production")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
@@ -161,8 +162,12 @@ def decode_token(token: str) -> Optional[str]:
 def require_auth(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> str:
-    token = credentials.credentials if credentials else None
-    username = decode_token(token) if token else None
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing Authorization header",
+        )
+    username = decode_token(credentials.credentials)
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
